@@ -39,7 +39,20 @@ export function QRPreview({ qrCodeData }: QRPreviewProps) {
     if (!qrRef.current || isEmpty) return;
 
     try {
-      const dataUrl = await htmlToImage.toPng(qrRef.current);
+      // Use better settings for image conversion
+      const dataUrl = await htmlToImage.toPng(qrRef.current, {
+        quality: 1.0,
+        pixelRatio: 2,
+        skipAutoScale: true,
+        canvasWidth: containerSize * 2, // Higher resolution
+        canvasHeight: containerSize * 2, // Higher resolution
+        style: {
+          margin: '0',
+          padding: `${containerPadding}px`,
+          background: qrCodeData.backgroundColor
+        }
+      });
+      
       const link = document.createElement("a");
       link.download = `qr-code-${Date.now()}.png`;
       link.href = dataUrl;
@@ -55,6 +68,7 @@ export function QRPreview({ qrCodeData }: QRPreviewProps) {
         description: "Failed to download QR code",
         variant: "destructive",
       });
+      console.error("Error downloading QR code:", error);
     }
   };
 
@@ -63,7 +77,19 @@ export function QRPreview({ qrCodeData }: QRPreviewProps) {
     if (!qrRef.current || isEmpty) return;
 
     try {
-      const dataUrl = await htmlToImage.toPng(qrRef.current);
+      // Use better settings for image conversion
+      const dataUrl = await htmlToImage.toPng(qrRef.current, {
+        quality: 1.0,
+        pixelRatio: 2,
+        skipAutoScale: true,
+        canvasWidth: containerSize * 2,
+        canvasHeight: containerSize * 2,
+        style: {
+          margin: '0',
+          padding: `${containerPadding}px`,
+          background: qrCodeData.backgroundColor
+        }
+      });
       
       // Create a blob from the data URL
       const blobBin = atob(dataUrl.split(",")[1]);
@@ -97,7 +123,19 @@ export function QRPreview({ qrCodeData }: QRPreviewProps) {
     
     if ('share' in navigator) {
       try {
-        const dataUrl = await htmlToImage.toPng(qrRef.current);
+        // Use better settings for image conversion
+        const dataUrl = await htmlToImage.toPng(qrRef.current, {
+          quality: 1.0,
+          pixelRatio: 2,
+          skipAutoScale: true,
+          canvasWidth: containerSize * 2,
+          canvasHeight: containerSize * 2,
+          style: {
+            margin: '0',
+            padding: `${containerPadding}px`,
+            background: qrCodeData.backgroundColor
+          }
+        });
         
         // Convert data URL to Blob
         const blobBin = atob(dataUrl.split(",")[1]);
@@ -136,17 +174,30 @@ export function QRPreview({ qrCodeData }: QRPreviewProps) {
     }
   };
 
+  // Calculate QR code sizes to prevent cutting off
+  const actualQrSize = qrCodeData.size;
+  const containerPadding = 16; // 16px padding
+  const containerSize = actualQrSize + (containerPadding * 2);
+
   return (
     <div className="flex flex-col items-center">
       <div
         ref={qrRef}
-        className="qr-code-container"
-        style={{ width: `${qrCodeData.size}px`, height: `${qrCodeData.size}px` }}
+        className="qr-code-container bg-background border border-border rounded-md overflow-hidden"
+        style={{ 
+          width: `${containerSize}px`, 
+          height: `${containerSize}px`,
+          padding: `${containerPadding}px`,
+          boxSizing: 'border-box',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
       >
         {!isEmpty ? (
           <QRCodeCanvas
             value={qrValue}
-            size={qrCodeData.size}
+            size={actualQrSize}
             level="H"
             fgColor={qrCodeData.foregroundColor}
             bgColor={qrCodeData.backgroundColor}
@@ -162,7 +213,6 @@ export function QRPreview({ qrCodeData }: QRPreviewProps) {
                   }
                 : undefined
             }
-            style={{ width: "100%", height: "100%" }}
           />
         ) : (
           <div className="flex items-center justify-center h-full w-full text-center p-4 text-gray-400">
@@ -175,7 +225,7 @@ export function QRPreview({ qrCodeData }: QRPreviewProps) {
         )}
       </div>
 
-      <div className="actions-container">
+      <div className="actions-container flex flex-wrap gap-2 mt-4 justify-center">
         <Button
           onClick={handleDownload}
           disabled={isEmpty}
