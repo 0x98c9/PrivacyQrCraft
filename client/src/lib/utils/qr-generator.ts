@@ -1,7 +1,5 @@
-// Types for QR code generation
 export type QRCodeType = "url" | "text" | "whatsapp";
 
-// Data structure for QR code generation
 export interface QRCodeData {
   type: QRCodeType;
   content: string;

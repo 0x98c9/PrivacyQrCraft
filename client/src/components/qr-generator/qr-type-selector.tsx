@@ -1,6 +1,6 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Link2, MessageSquare, Type } from "lucide-react";
 import { QRCodeType } from "@/lib/utils/qr-generator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface QRTypeSelectorProps {
   qrType: QRCodeType;
@@ -8,34 +8,34 @@ interface QRTypeSelectorProps {
 }
 
 export function QRTypeSelector({ qrType, onTypeChange }: QRTypeSelectorProps) {
+  const handleTypeChange = (value: string) => {
+    onTypeChange(value as QRCodeType);
+  };
+
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">QR Code Type</h2>
-        <div className="grid grid-cols-3 gap-3">
-          <Button
-            variant={qrType === "url" ? "default" : "outline"}
-            onClick={() => onTypeChange("url")}
-            className="w-full"
-          >
-            URL
-          </Button>
-          <Button
-            variant={qrType === "text" ? "default" : "outline"}
-            onClick={() => onTypeChange("text")}
-            className="w-full"
-          >
-            Text
-          </Button>
-          <Button
-            variant={qrType === "whatsapp" ? "default" : "outline"}
-            onClick={() => onTypeChange("whatsapp")}
-            className="w-full"
-          >
-            WhatsApp
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="mb-6">
+      <h2 className="text-lg font-medium mb-2 text-foreground">QR Code Type</h2>
+      <Tabs
+        defaultValue={qrType}
+        value={qrType}
+        onValueChange={handleTypeChange}
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="url" className="flex items-center gap-2">
+            <Link2 className="h-4 w-4" />
+            <span className="hidden sm:inline">URL</span>
+          </TabsTrigger>
+          <TabsTrigger value="text" className="flex items-center gap-2">
+            <Type className="h-4 w-4" />
+            <span className="hidden sm:inline">Text</span>
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">WhatsApp</span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </div>
   );
 }

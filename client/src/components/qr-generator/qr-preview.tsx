@@ -1,11 +1,10 @@
-import { useRef, useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { QRCodeSVG } from "qrcode.react";
-import { Download, Copy, Share, Shield } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { QRCodeData } from "@/lib/utils/qr-generator";
-import { toPng } from "html-to-image";
+import { useRef, useEffect } from "react";
+import { QRCodeCanvas } from "qrcode.react";
+import { Button } from "@/components/ui/button";
+import { Download, Copy, Share2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import * as htmlToImage from "html-to-image";
 
 interface QRPreviewProps {
   qrCodeData: QRCodeData;
@@ -14,175 +13,202 @@ interface QRPreviewProps {
 export function QRPreview({ qrCodeData }: QRPreviewProps) {
   const { toast } = useToast();
   const qrRef = useRef<HTMLDivElement>(null);
-  const [canShare, setCanShare] = useState(false);
-  const [isQRVisible, setIsQRVisible] = useState(false);
-  
-  // Check if Web Share API is available
-  useEffect(() => {
-    setCanShare(!!navigator.share);
-  }, []);
-  
-  // Check if QR code is visible based on content
-  useEffect(() => {
-    setIsQRVisible(!!qrCodeData.content);
-  }, [qrCodeData.content]);
 
-  // Add logo to QR code if provided
-  const renderQRCode = () => {
-    const logoImage = qrCodeData.logoImg ? {
-      src: qrCodeData.logoImg.src,
-      height: qrCodeData.size * (qrCodeData.logoSize / 100),
-      width: qrCodeData.size * (qrCodeData.logoSize / 100),
-      excavate: true,
-    } : undefined;
-
-    return (
-      <QRCodeSVG
-        value={qrCodeData.content || " "}
-        size={qrCodeData.size}
-        bgColor={qrCodeData.backgroundColor}
-        fgColor={qrCodeData.foregroundColor}
-        level="H"
-        imageSettings={logoImage}
-      />
-    );
+  // Determine QR code content based on type
+  const getQrValue = () => {
+    switch (qrCodeData.type) {
+      case "url":
+        return qrCodeData.url;
+      case "text":
+        return qrCodeData.text;
+      case "whatsapp":
+        const phone = qrCodeData.phone.replace(/[^0-9+]/g, "");
+        return `https://wa.me/${phone}${
+          qrCodeData.message ? `?text=${encodeURIComponent(qrCodeData.message)}` : ""
+        }`;
+      default:
+        return "";
+    }
   };
 
-  const downloadQRCode = async () => {
-    if (!qrRef.current || !qrCodeData.content) return;
-    
+  const qrValue = getQrValue();
+  const isEmpty = qrValue.trim() === "";
+
+  // Handle download QR code
+  const handleDownload = async () => {
+    if (!qrRef.current || isEmpty) return;
+
     try {
-      const dataUrl = await toPng(qrRef.current, { quality: 1.0 });
+      const dataUrl = await htmlToImage.toPng(qrRef.current);
       const link = document.createElement("a");
-      link.download = "qrcode.png";
+      link.download = `qr-code-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
       
       toast({
-        title: "QR Code Downloaded",
-        description: "Your QR code has been downloaded successfully.",
+        title: "Success",
+        description: "QR code downloaded successfully",
       });
     } catch (error) {
       toast({
-        title: "Download Failed",
-        description: "Failed to download the QR code.",
+        title: "Error",
+        description: "Failed to download QR code",
         variant: "destructive",
       });
     }
   };
 
-  const copyQRCode = async () => {
-    if (!qrRef.current || !qrCodeData.content) return;
-    
+  // Handle copy QR code
+  const handleCopy = async () => {
+    if (!qrRef.current || isEmpty) return;
+
     try {
-      const dataUrl = await toPng(qrRef.current, { quality: 1.0 });
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
+      const dataUrl = await htmlToImage.toPng(qrRef.current);
       
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          [blob.type]: blob
-        })
-      ]);
+      // Create a blob from the data URL
+      const blobBin = atob(dataUrl.split(",")[1]);
+      const array = [];
+      for (let i = 0; i < blobBin.length; i++) {
+        array.push(blobBin.charCodeAt(i));
+      }
+      const blob = new Blob([new Uint8Array(array)], { type: "image/png" });
+      
+      // Copy the blob to clipboard
+      const clipboardItemData = { [blob.type]: blob };
+      await navigator.clipboard.write([new ClipboardItem(clipboardItemData)]);
       
       toast({
-        title: "QR Code Copied",
-        description: "Your QR code has been copied to clipboard.",
+        title: "Success",
+        description: "QR code copied to clipboard",
       });
     } catch (error) {
       toast({
-        title: "Copy Failed",
-        description: "Failed to copy the QR code. Your browser may not support this feature.",
+        title: "Error",
+        description: "Failed to copy QR code",
         variant: "destructive",
       });
+      console.error("Error copying QR code:", error);
     }
   };
 
-  const shareQRCode = async () => {
-    if (!qrRef.current || !qrCodeData.content || !navigator.share) return;
+  // Handle sharing QR code
+  const handleShare = async () => {
+    if (!qrRef.current || isEmpty) return;
     
-    try {
-      const dataUrl = await toPng(qrRef.current, { quality: 1.0 });
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const file = new File([blob], "qrcode.png", { type: "image/png" });
-      
-      await navigator.share({
-        title: "QR Code",
-        text: "Check out this QR code!",
-        files: [file]
-      });
-    } catch (error) {
+    if ('share' in navigator) {
+      try {
+        const dataUrl = await htmlToImage.toPng(qrRef.current);
+        
+        // Convert data URL to Blob
+        const blobBin = atob(dataUrl.split(",")[1]);
+        const array = [];
+        for (let i = 0; i < blobBin.length; i++) {
+          array.push(blobBin.charCodeAt(i));
+        }
+        const blob = new Blob([new Uint8Array(array)], { type: "image/png" });
+        const file = new File([blob], "qr-code.png", { type: "image/png" });
+        
+        await navigator.share({
+          title: "My QR Code",
+          files: [file],
+        });
+        
+        toast({
+          title: "Success",
+          description: "QR code shared successfully",
+        });
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          toast({
+            title: "Error",
+            description: "Failed to share QR code",
+            variant: "destructive",
+          });
+          console.error("Error sharing QR code:", error);
+        }
+      }
+    } else {
       toast({
-        title: "Share Failed",
-        description: "Failed to share the QR code.",
+        title: "Error",
+        description: "Sharing is not supported on this device",
         variant: "destructive",
       });
     }
   };
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">QR Code Preview</h2>
-        <div className="flex flex-col items-center justify-center">
-          {!isQRVisible ? (
-            <div 
-              className="border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center" 
-              style={{ width: `${qrCodeData.size}px`, height: `${qrCodeData.size}px` }}
-            >
-              <p className="text-gray-400 text-center px-4">Enter content to generate QR code</p>
-            </div>
-          ) : (
-            <div ref={qrRef} className="flex justify-center items-center bg-white p-4 rounded-lg">
-              {renderQRCode()}
-            </div>
-          )}
-          
-          {/* Actions */}
-          <div className="mt-6 w-full space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button
-                onClick={downloadQRCode}
-                disabled={!isQRVisible}
-                className="w-full"
-              >
-                <Download className="h-5 w-5 mr-2" />
-                Download PNG
-              </Button>
-              <Button
-                onClick={copyQRCode}
-                disabled={!isQRVisible}
-                variant="outline"
-                className="w-full"
-              >
-                <Copy className="h-5 w-5 mr-2" />
-                Copy QR Code
-              </Button>
-            </div>
-            
-            {canShare && (
-              <Button
-                onClick={shareQRCode}
-                disabled={!isQRVisible}
-                variant="outline"
-                className="w-full"
-              >
-                <Share className="h-5 w-5 mr-2" />
-                Share QR Code
-              </Button>
-            )}
+    <div className="flex flex-col items-center">
+      <div
+        ref={qrRef}
+        className="qr-code-container"
+        style={{ width: `${qrCodeData.size}px`, height: `${qrCodeData.size}px` }}
+      >
+        {!isEmpty ? (
+          <QRCodeCanvas
+            value={qrValue}
+            size={qrCodeData.size}
+            level="H"
+            fgColor={qrCodeData.foregroundColor}
+            bgColor={qrCodeData.backgroundColor}
+            imageSettings={
+              qrCodeData.logo && qrCodeData.logoImg
+                ? {
+                    src: URL.createObjectURL(qrCodeData.logo),
+                    x: undefined,
+                    y: undefined,
+                    height: qrCodeData.logoSize,
+                    width: qrCodeData.logoSize,
+                    excavate: true,
+                  }
+                : undefined
+            }
+            style={{ width: "100%", height: "100%" }}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full w-full text-center p-4 text-gray-400">
+            {qrCodeData.type === "url"
+              ? "Enter a URL to generate QR code"
+              : qrCodeData.type === "text"
+              ? "Enter text to generate QR code"
+              : "Enter a phone number to generate QR code"}
           </div>
-          
-          {/* Privacy Badge */}
-          <div className="mt-6 text-center">
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-              <Shield className="h-4 w-4 mr-1" />
-              100% Private - No Data Storage
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+
+      <div className="actions-container">
+        <Button
+          onClick={handleDownload}
+          disabled={isEmpty}
+          variant="secondary"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Download
+        </Button>
+        <Button
+          onClick={handleCopy}
+          disabled={isEmpty}
+          variant="secondary"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <Copy className="h-4 w-4" />
+          Copy
+        </Button>
+        {'share' in navigator && (
+          <Button
+            onClick={handleShare}
+            disabled={isEmpty}
+            variant="secondary"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Share2 className="h-4 w-4" />
+            Share
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

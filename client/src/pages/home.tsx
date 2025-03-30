@@ -1,72 +1,69 @@
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { QRTypeSelector } from "@/components/qr-generator/qr-type-selector";
 import { InputFields } from "@/components/qr-generator/input-fields";
 import { CustomizationOptions } from "@/components/qr-generator/customization-options";
 import { QRPreview } from "@/components/qr-generator/qr-preview";
-import { useState, useEffect } from "react";
 import { QRCodeType, QRCodeData } from "@/lib/utils/qr-generator";
 
-const Home = () => {
-  // QR code state
+export default function Home() {
+  // QR code type state
   const [qrType, setQrType] = useState<QRCodeType>("url");
-  const [url, setUrl] = useState("");
+  
+  // Input fields state
+  const [url, setUrl] = useState("https://");
   const [text, setText] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
-  const [qrSize, setQrSize] = useState(250);
+  
+  // Customization options state
+  const [qrSize, setQrSize] = useState(200);
   const [foregroundColor, setForegroundColor] = useState("#000000");
   const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
   const [logo, setLogo] = useState<File | null>(null);
   const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null);
-  const [logoSize, setLogoSize] = useState(15);
-  const [qrContent, setQrContent] = useState("");
-
-  // Generate QR code content based on type and inputs
-  useEffect(() => {
-    let content = "";
-    
-    if (qrType === "url") {
-      content = url;
-    } else if (qrType === "text") {
-      content = text;
-    } else if (qrType === "whatsapp") {
-      if (phone) {
-        // Format WhatsApp URL
-        const formattedPhone = phone.replace(/[^0-9+]/g, "");
-        content = `https://wa.me/${formattedPhone}`;
-        if (message) {
-          content += `?text=${encodeURIComponent(message)}`;
-        }
-      }
-    }
-    
-    setQrContent(content);
-  }, [qrType, url, text, phone, message]);
+  const [logoSize, setLogoSize] = useState(50);
 
   // Handle logo upload
-  const handleLogoUpload = (file: File | null) => {
-    setLogo(file);
-    
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          setLogoImg(img);
-        };
-        img.src = event.target?.result as string;
+  useEffect(() => {
+    if (logo) {
+      const img = new Image();
+      img.onload = () => {
+        setLogoImg(img);
       };
-      reader.readAsDataURL(file);
+      img.src = URL.createObjectURL(logo);
+
+      // Clean up on unmount
+      return () => {
+        URL.revokeObjectURL(img.src);
+      };
     } else {
       setLogoImg(null);
     }
+  }, [logo]);
+
+  // Update QR code content based on type
+  const getQrContent = () => {
+    switch (qrType) {
+      case "url":
+        return url;
+      case "text":
+        return text;
+      case "whatsapp":
+        const phoneNumber = phone.replace(/[^0-9+]/g, "");
+        return `https://wa.me/${phoneNumber}${
+          message ? `?text=${encodeURIComponent(message)}` : ""
+        }`;
+      default:
+        return "";
+    }
   };
 
-  // Create QR code data object for passing to components
+  // QR code data
   const qrCodeData: QRCodeData = {
     type: qrType,
-    content: qrContent,
+    content: getQrContent(),
     url,
     text,
     phone,
@@ -76,24 +73,22 @@ const Home = () => {
     backgroundColor,
     logo,
     logoImg,
-    logoSize
+    logoSize,
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="flex flex-col min-h-screen">
       <Header />
       
-      <main className="flex-grow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="lg:grid lg:grid-cols-2 lg:gap-8">
-            {/* Left Side: Controls */}
-            <div className="space-y-6 mb-8 lg:mb-0">
-              <QRTypeSelector 
-                qrType={qrType}
-                onTypeChange={setQrType}
-              />
+      <main className="flex-1 py-8">
+        <div className="container px-4 sm:px-6 lg:px-8 mx-auto max-w-7xl">
+          <div className="grid gap-8 lg:grid-cols-[1fr,400px]">
+            <div className="qr-container">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Create QR Code</h2>
               
-              <InputFields 
+              <QRTypeSelector qrType={qrType} onTypeChange={setQrType} />
+              
+              <InputFields
                 qrType={qrType}
                 url={url}
                 onUrlChange={setUrl}
@@ -105,29 +100,37 @@ const Home = () => {
                 onMessageChange={setMessage}
               />
               
-              <CustomizationOptions 
+              <CustomizationOptions
                 qrSize={qrSize}
                 onQrSizeChange={setQrSize}
                 foregroundColor={foregroundColor}
                 onForegroundColorChange={setForegroundColor}
                 backgroundColor={backgroundColor}
                 onBackgroundColorChange={setBackgroundColor}
+                logo={logo}
+                onLogoUpload={setLogo}
                 logoSize={logoSize}
                 onLogoSizeChange={setLogoSize}
-                onLogoUpload={handleLogoUpload}
-                logo={logo}
               />
             </div>
             
-            {/* Right Side: QR Code Preview */}
-            <QRPreview qrCodeData={qrCodeData} />
+            <div className="qr-container flex flex-col justify-center items-center">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Preview</h2>
+              <QRPreview qrCodeData={qrCodeData} />
+            </div>
+          </div>
+          
+          <div className="mt-12 bg-muted/50 rounded-lg p-6">
+            <h2 className="text-xl font-bold text-foreground mb-3">Privacy First</h2>
+            <p className="text-muted-foreground">
+              This QR code generator works entirely in your browser. No data is sent to or stored on any server. 
+              Your QR codes and their contents are never tracked, stored, or shared with third parties.
+            </p>
           </div>
         </div>
       </main>
-      
+
       <Footer />
     </div>
   );
-};
-
-export default Home;
+}
